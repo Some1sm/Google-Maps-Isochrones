@@ -406,7 +406,13 @@ function bindEvents() {
   });
 
   document.getElementById('btn-download-raw').addEventListener('click', () => {
-    downloadFile(JSON.stringify(state.lastRawResponse, null, 2), `isochrone_response_${Date.now()}.json`, 'application/json');
+    if (!state.lastRawResponse) {
+      showToast('No Raw Response to download. Please generate isochrones first.', 'error');
+      return;
+    }
+    const maxDurationSec = state.durations && state.durations.length > 0 ? Math.max(...state.durations) : 600;
+    const filenameRaw = `isochrone_raw_${state.travelMode.toLowerCase()}_${maxDurationSec}s_${state.origin.lat}_${state.origin.lng}.json`;
+    downloadFile(JSON.stringify(state.lastRawResponse, null, 2), filenameRaw, 'application/json');
   });
 
   // File Import Action
