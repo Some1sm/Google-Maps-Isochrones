@@ -87,23 +87,23 @@ function initDOMReferences() {
 // Labels are rendered in their own high-z pane so they always show ABOVE isochrone polygons
 const BASEMAP_TILES = {
   DARK: {
-    // Dark basemap + CartoDB dark_only_labels (white text, built for dark backgrounds)
-    base: 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
-    labels: 'https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',
+    // Full CartoDB Dark Matter tile — labels already beautifully integrated
+    base: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    labels: null,
     subdomains: 'abcd',
     labelSubdomains: 'abcd',
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
   },
   LIGHT: {
-    // Light basemap + CartoDB light_only_labels (dark text, built for light backgrounds)
-    base: 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
-    labels: 'https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png',
+    // Full CartoDB Positron tile — labels already beautifully integrated
+    base: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+    labels: null,
     subdomains: 'abcd',
     labelSubdomains: 'abcd',
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
   },
   SATELLITE_HYBRID: {
-    // Esri World Imagery base + Esri reference labels (white text with halos for satellite)
+    // Esri World Imagery base + Esri reference labels (white text with halos, above polygons)
     base: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     labels: 'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
     subdomains: '',
