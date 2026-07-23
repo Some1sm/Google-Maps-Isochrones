@@ -1406,10 +1406,23 @@ function handleImportedFiles(fileList) {
     reader.onload = (event) => {
       try {
         const parsed = JSON.parse(event.target.result);
-        const geojson = convertToStandardGeoJSON(parsed, file.name);
+        let geojson = null;
+
+        if (typeof convertToStandardGeoJSON === 'function') {
+          geojson = convertToStandardGeoJSON(parsed, file.name);
+        } else if (parsed.type === 'FeatureCollection') {
+          geojson = parsed;
+        } else if (parsed.type === 'Feature') {
+          geojson = { type: 'FeatureCollection', features: [parsed] };
+        }
+
         if (geojson && geojson.features && geojson.features.length > 0) {
           const cleanName = file.name.replace(/\.[^/.]+$/, "");
-          addLayer(geojson, cleanName, { source: 'imported' });
+          if (typeof addLayer === 'function') {
+            addLayer(geojson, cleanName, { source: 'imported' });
+          } else if (typeof handleImportedFileData === 'function') {
+            handleImportedFileData(parsed, file.name);
+          }
           showToast(`Imported "${cleanName}" (${geojson.features.length} zones)`, 'success');
         } else {
           showToast(`No valid geometry in "${file.name}"`, 'error');
