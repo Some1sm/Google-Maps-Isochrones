@@ -454,22 +454,27 @@ function bindEvents() {
   }
 }
 
-// Handle Imported GeoJSON or Google API JSON File Data
-function handleImportedFileData(parsed, filename) {
+// Convert Imported JSON / GeoJSON / Google Raw Output to standard RFC 7946 GeoJSON FeatureCollection
+function convertToStandardGeoJSON(parsed, filename) {
+  if (!parsed) return null;
+
   let geojson = null;
-  let rawResponse = parsed;
 
   if (parsed.type === "FeatureCollection") {
     geojson = parsed;
-    geojson.features.forEach((feat, idx) => {
-      if (!feat.properties) feat.properties = {};
-      const color = CONTOUR_COLORS[idx % CONTOUR_COLORS.length] || CONTOUR_COLORS[0];
-      if (!feat.properties.fill_color) feat.properties.fill_color = color.fill;
-      if (!feat.properties.stroke_color) feat.properties.stroke_color = color.stroke;
-      if (!feat.properties.fill_opacity) feat.properties.fill_opacity = 0.35;
-      if (!feat.properties.stroke_weight) feat.properties.stroke_weight = 2;
-      if (!feat.properties.duration_formatted) feat.properties.duration_formatted = `Contour ${idx + 1}`;
-    });
+    if (geojson.features) {
+      geojson.features.forEach((feat, idx) => {
+        if (!feat.properties) feat.properties = {};
+        const color = CONTOUR_COLORS[idx % CONTOUR_COLORS.length] || CONTOUR_COLORS[0];
+        if (!feat.properties.fill_color) feat.properties.fill_color = color.fill;
+        if (!feat.properties.stroke_color) feat.properties.stroke_color = color.stroke;
+        if (!feat.properties.fill_opacity) feat.properties.fill_opacity = 0.35;
+        if (!feat.properties.stroke_weight) feat.properties.stroke_weight = 2;
+        if (!feat.properties.duration_formatted) {
+          feat.properties.duration_formatted = feat.properties.duration_minutes ? `${feat.properties.duration_minutes} mins` : (feat.properties.duration_seconds ? `${Math.round(feat.properties.duration_seconds / 60)} mins` : `Contour ${idx + 1}`);
+        }
+      });
+    }
   } else if (parsed.type === "Feature") {
     const color = CONTOUR_COLORS[0];
     if (!parsed.properties) parsed.properties = {};
@@ -502,6 +507,14 @@ function handleImportedFileData(parsed, filename) {
       }]
     };
   }
+
+  return geojson;
+}
+
+// Handle Imported GeoJSON or Google API JSON File Data
+function handleImportedFileData(parsed, filename) {
+  const geojson = convertToStandardGeoJSON(parsed, filename);
+  const rawResponse = parsed;
 
   if (geojson && geojson.features && geojson.features.length > 0) {
     state.lastGeoJSON = geojson;
