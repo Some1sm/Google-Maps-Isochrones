@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Google Maps Isochrones API GUI & GeoJSON Generator</title>
+  <meta name="description" content="Configure Google Maps Isochrones API parameters, visualize reachable travel-time contours on an interactive map, and generate standard GeoJSON files.">
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+
+  <!-- App Styles -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="dark-theme">
+
+  <!-- Application Header -->
+  <header class="app-header">
+    <div class="brand">
+      <div class="brand-logo">
+        <i class="fa-solid fa-map-location-dot"></i>
+      </div>
+      <div class="brand-text">
+        <h1>Google Maps Isochrones <span>Studio</span></h1>
+        <span class="badge">API v1 Spec</span>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <div class="mode-badge" id="execution-mode-badge" title="Current API Execution Mode">
+        <i class="fa-solid fa-bolt"></i> <span id="mode-text">Simulator Mode</span>
+      </div>
+      <button class="btn btn-secondary mobile-toggle-btn" id="btn-toggle-sidebar" title="Toggle Configuration Panel">
+        <i class="fa-solid fa-sliders"></i> <span class="mobile-btn-text">Params</span>
+      </button>
+      <label class="btn btn-secondary" style="cursor: pointer;" title="Import .geojson or Google API .json file">
+        <i class="fa-solid fa-file-import"></i> <span class="mobile-btn-text">Import</span>
+        <input type="file" id="input-file-import" accept=".geojson,.json" style="display: none;">
+      </label>
+      <button class="btn btn-secondary" id="btn-reset-defaults" title="Reset settings">
+        <i class="fa-solid fa-rotate-left"></i> <span class="mobile-btn-text">Reset</span>
+      </button>
+      <button class="btn btn-primary" id="btn-generate-main">
+        <i class="fa-solid fa-play"></i> Generate
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="app-container">
+    <!-- Sidebar Control Panel -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-scroll">
+
+        <!-- Card 1: API Configuration -->
+        <section class="card">
+          <div class="card-header">
+            <i class="fa-solid fa-key text-accent"></i>
+            <h2>API & Execution Mode</h2>
+            <i class="fa-solid fa-chevron-down card-toggle-icon" style="margin-left: auto; font-size: 0.8rem; color: var(--text-muted);"></i>
+          </div>
+          <div class="card-body">
+            <div class="form-group">
+              <label for="api-key">Google Maps API Key</label>
+              <div class="input-with-action">
+                <input type="password" id="api-key" placeholder="AIzaSy..." autocomplete="off">
+                <button type="button" class="btn-icon" id="toggle-api-key" title="Toggle visibility">
+                  <i class="fa-solid fa-eye"></i>
+                </button>
+              </div>
+              <small class="help-text">Requires Routes / Isochrones API enabled on Google Cloud Console.</small>
+            </div>
+
+            <div class="form-group">
+              <label>Target Service Engine</label>
+              <div class="radio-group">
+                <label class="radio-card">
+                  <input type="radio" name="api-mode" value="simulator" checked>
+                  <div class="radio-card-content">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    <div>
+                      <strong>Offline Simulator</strong>
+                      <small>Instant demo polygons without API key</small>
+                    </div>
+                  </div>
+                </label>
+                <label class="radio-card">
+                  <input type="radio" name="api-mode" value="live">
+                  <div class="radio-card-content">
+                    <i class="fa-solid fa-cloud-bolt"></i>
+                    <div>
+                      <strong>Live Google REST API</strong>
+                      <small>Direct request to isochrones.googleapis.com</small>
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="fetch-strategy">Multi-Contour Fetch Strategy</label>
+              <select id="fetch-strategy">
+                <option value="PARALLEL" selected>Concurrent Parallel (Promise.all - 1 call per duration)</option>
+                <option value="SEQUENTIAL">Sequential (Paced 1-by-1)</option>
+                <option value="MAX_ONLY">Single Call (Max checked duration only)</option>
+              </select>
+              <small class="help-text">Google API spec takes 1 travelDuration string per REST payload.</small>
+            </div>
+          </div>
+        </section>
+
+        <!-- Card 2: Location / Origin -->
+        <section class="card">
+          <div class="card-header">
+            <i class="fa-solid fa-location-crosshairs text-accent"></i>
+            <h2>Origin Location</h2>
+            <i class="fa-solid fa-chevron-down card-toggle-icon" style="margin-left: auto; font-size: 0.8rem; color: var(--text-muted);"></i>
+          </div>
+          <div class="card-body">
+            <div class="form-group">
+              <label for="location-search">Search Location / Address</label>
+              <div class="input-with-action">
+                <input type="text" id="location-search" placeholder="e.g. Times Square, New York or Paris">
+                <button type="button" class="btn btn-secondary" id="btn-search-location" title="Search address">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                </button>
+                <button type="button" class="btn btn-secondary" id="btn-current-location" title="Use current GPS location">
+                  <i class="fa-solid fa-location-crosshairs text-accent"></i> <span class="mobile-btn-text">GPS</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group col">
+                <label for="origin-lat">Latitude</label>
+                <input type="number" id="origin-lat" step="any" value="40.7580">
+              </div>
+              <div class="form-group col">
+                <label for="origin-lng">Longitude</label>
+                <input type="number" id="origin-lng" step="any" value="-73.9855">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="place-id">Place ID (Optional alternative to Lat/Lng)</label>
+              <input type="text" id="place-id" placeholder="e.g. ChIJmQJI2V1ZwokRcm-XHwmx4G8">
+            </div>
+
+            <div class="preset-buttons">
+              <span class="preset-label">Quick Presets:</span>
+              <button type="button" class="btn-chip" id="btn-chip-gps"><i class="fa-solid fa-crosshairs text-accent"></i> My GPS</button>
+              <button type="button" class="btn-chip" data-lat="40.7580" data-lng="-73.9855" data-name="New York">NYC</button>
+              <button type="button" class="btn-chip" data-lat="51.5074" data-lng="-0.1278" data-name="London">London</button>
+              <button type="button" class="btn-chip" data-lat="48.8566" data-lng="2.3522" data-name="Paris">Paris</button>
+              <button type="button" class="btn-chip" data-lat="35.6762" data-lng="139.6503" data-name="Tokyo">Tokyo</button>
+              <button type="button" class="btn-chip" data-lat="37.7749" data-lng="-122.4194" data-name="San Francisco">SF</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Card 3: Travel Modes & Directions -->
+        <section class="card">
+          <div class="card-header">
+            <i class="fa-solid fa-route text-accent"></i>
+            <h2>Travel Parameters</h2>
+            <i class="fa-solid fa-chevron-down card-toggle-icon" style="margin-left: auto; font-size: 0.8rem; color: var(--text-muted);"></i>
+          </div>
+          <div class="card-body">
+            <div class="form-group">
+              <label>Travel Mode (travelMode)</label>
+              <div class="pill-group" id="travel-mode-pills">
+                <button type="button" class="pill active" data-value="DRIVE"><i class="fa-solid fa-car"></i> DRIVE</button>
+                <button type="button" class="pill" data-value="WALK"><i class="fa-solid fa-person-walking"></i> WALK</button>
+                <button type="button" class="pill" data-value="BICYCLE"><i class="fa-solid fa-bicycle"></i> BICYCLE</button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="travel-direction">Travel Direction (travelDirection)</label>
+              <select id="travel-direction">
+                <option value="FROM" selected>FROM (Outbound - Reachable area starting from origin)</option>
+                <option value="TO">TO (Inbound - Reachable area arriving at destination)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Isochrone Durations (travelDuration / thresholds)</label>
+              <small class="help-text" id="duration-max-limit">Max limit: 60 mins for DRIVE</small>
+              <div class="checkbox-grid" id="duration-checkboxes">
+                <label class="checkbox-chip"><input type="checkbox" value="300" checked> 5 min (300s)</label>
+                <label class="checkbox-chip"><input type="checkbox" value="600" checked> 10 min (600s)</label>
+                <label class="checkbox-chip"><input type="checkbox" value="900" checked> 15 min (900s)</label>
+                <label class="checkbox-chip"><input type="checkbox" value="1800"> 30 min (1800s)</label>
+                <label class="checkbox-chip"><input type="checkbox" value="2700"> 45 min (2700s)</label>
+                <label class="checkbox-chip"><input type="checkbox" value="3600"> 60 min (3600s)</label>
+              </div>
+              <div class="input-with-action margin-top-xs">
+                <input type="number" id="custom-duration-min" placeholder="Add custom minutes (1 - 60)" max="60">
+                <button type="button" class="btn btn-secondary" id="btn-add-custom-duration">Add</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Card 4: Routing & Traffic -->
+        <section class="card">
+          <div class="card-header">
+            <i class="fa-solid fa-traffic-light text-accent"></i>
+            <h2>Routing & Traffic Options</h2>
+            <i class="fa-solid fa-chevron-down card-toggle-icon" style="margin-left: auto; font-size: 0.8rem; color: var(--text-muted);"></i>
+          </div>
+          <div class="card-body">
+            <div class="form-group">
+              <label for="routing-preference">Routing Preference (routingPreference)</label>
+              <select id="routing-preference">
+                <option value="TRAFFIC_AWARE" selected>TRAFFIC_AWARE (Live traffic consideration)</option>
+                <option value="TRAFFIC_UNAWARE">TRAFFIC_UNAWARE (Free-flow speed profiles)</option>
+                <option value="TRAFFIC_AWARE_OPTIMAL">TRAFFIC_AWARE_OPTIMAL (Optimal routing & traffic)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="departure-time-option">Time Condition</label>
+              <select id="departure-time-option">
+                <option value="NOW" selected>Depart Now (Current Timestamp)</option>
+                <option value="CUSTOM">Specific Date / Time</option>
+              </select>
+            </div>
+
+            <div class="form-group hidden" id="custom-time-container">
+              <label for="custom-datetime">Departure / Arrival Timestamp</label>
+              <input type="datetime-local" id="custom-datetime">
+            </div>
+
+            <div class="form-group">
+              <label>Route Modifiers / Avoidances</label>
+              <div class="checkbox-list">
+                <label class="checkbox-row"><input type="checkbox" id="avoid-tolls"> Avoid Tolls (avoidTolls)</label>
+                <label class="checkbox-row"><input type="checkbox" id="avoid-highways"> Avoid Highways (avoidHighways)</label>
+                <label class="checkbox-row"><input type="checkbox" id="avoid-ferries"> Avoid Ferries (avoidFerries)</label>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Card 5: Polygon Customization -->
+        <section class="card">
+          <div class="card-header">
+            <i class="fa-solid fa-draw-polygon text-accent"></i>
+            <h2>Polygon Customization</h2>
+          </div>
+          <div class="card-body">
+            <div class="form-group">
+              <div class="toggle-row">
+                <div>
+                  <strong>Enable Smoothing</strong>
+                  <small>Smooths sharp polygon corners</small>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="enable-smoothing" checked>
+                  <span class="slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="polygon-fidelity">Polygon Fidelity (polygonFidelity)</label>
+              <select id="polygon-fidelity">
+                <option value="HIGH" selected>HIGH (Detailed road-network accuracy)</option>
+                <option value="MEDIUM">MEDIUM (Balanced geometry size)</option>
+                <option value="LOW">LOW (Generalized outer boundary)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="display-style">Map Display Style</label>
+              <select id="display-style">
+                <option value="BANDS" selected>Ring Bands (Non-Overlapping Crisp Colors)</option>
+                <option value="STACKED">Filled Overlapping Polygons</option>
+                <option value="OUTLINES">Hollow High-Contrast Outlines Only</option>
+              </select>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </aside>
+
+    <!-- Content Workspace Area -->
+    <section class="workspace">
+      <!-- Tabs Header -->
+      <div class="workspace-tabs">
+        <button class="tab-btn active" data-tab="tab-map">
+          <i class="fa-solid fa-map"></i> Map Visualizer
+        </button>
+        <button class="tab-btn" data-tab="tab-geojson">
+          <i class="fa-solid fa-code"></i> GeoJSON Output
+        </button>
+        <button class="tab-btn" data-tab="tab-curl">
+          <i class="fa-solid fa-terminal"></i> cURL & REST Request
+        </button>
+        <button class="tab-btn" data-tab="tab-raw">
+          <i class="fa-solid fa-brackets-curly"></i> Raw API Response
+        </button>
+      </div>
+
+      <!-- Tab Content 1: Map View -->
+      <div class="tab-pane active" id="tab-map">
+        <div class="map-container-wrapper">
+          <div id="map"></div>
+          
+          <!-- Map Overlay Stats / Legend -->
+          <div class="map-legend-card" id="map-legend">
+            <h4><i class="fa-solid fa-layer-group"></i> Isochrone Contours</h4>
+            <div id="legend-items">
+              <span class="text-muted">Click "Generate Isochrones" to view reachability zones.</span>
+            </div>
+          </div>
+
+          <div class="map-stats-card hidden" id="map-stats">
+            <div class="stat-box">
+              <span class="stat-value" id="stat-contours">0</span>
+              <span class="stat-label">Contours</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-value" id="stat-max-area">0 km²</span>
+              <span class="stat-label">Max Coverage Area</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-value" id="stat-mode">DRIVE</span>
+              <span class="stat-label">Travel Mode</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Content 2: GeoJSON View -->
+      <div class="tab-pane" id="tab-geojson">
+        <div class="code-panel">
+          <div class="code-header">
+            <span><i class="fa-solid fa-file-code"></i> feature_collection.geojson</span>
+            <div class="code-actions">
+              <button class="btn btn-secondary btn-sm" id="btn-copy-geojson">
+                <i class="fa-solid fa-copy"></i> Copy GeoJSON
+              </button>
+              <button class="btn btn-primary btn-sm" id="btn-download-geojson">
+                <i class="fa-solid fa-download"></i> Download .geojson
+              </button>
+            </div>
+          </div>
+          <pre class="code-content"><code id="code-geojson-display">// GeoJSON output will be formatted here...</code></pre>
+        </div>
+      </div>
+
+      <!-- Tab Content 3: cURL Request View -->
+      <div class="tab-pane" id="tab-curl">
+        <div class="code-panel">
+          <div class="code-header">
+            <span><i class="fa-solid fa-terminal"></i> cURL & REST Request Payload</span>
+            <div class="code-actions">
+              <button class="btn btn-secondary btn-sm" id="btn-copy-curl">
+                <i class="fa-solid fa-copy"></i> Copy cURL
+              </button>
+            </div>
+          </div>
+          <pre class="code-content"><code id="code-curl-display">// cURL request will be generated here...</code></pre>
+        </div>
+      </div>
+
+      <!-- Tab Content 4: Raw Response View -->
+      <div class="tab-pane" id="tab-raw">
+        <div class="code-panel">
+          <div class="code-header">
+            <span><i class="fa-solid fa-brackets-curly"></i> Google Isochrones API Raw Response</span>
+            <div class="code-actions">
+              <button class="btn btn-secondary btn-sm" id="btn-copy-raw">
+                <i class="fa-solid fa-copy"></i> Copy Raw JSON
+              </button>
+              <button class="btn btn-secondary btn-sm" id="btn-download-raw">
+                <i class="fa-solid fa-file-arrow-down"></i> Download .json
+              </button>
+            </div>
+          </div>
+          <pre class="code-content"><code id="code-raw-display">// Raw API JSON response will appear here...</code></pre>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Notification Toast -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  
+  <!-- Turf.js for spatial area calculations -->
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+
+  <!-- Main JavaScript App -->
+  <script src="app.js"></script>
+</body>
+</html>
