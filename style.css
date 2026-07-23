@@ -793,6 +793,117 @@ input:checked + .slider:before {
   border-left-color: var(--accent-emerald);
 }
 
+/* Layer Manager Toolbar & Item Styling */
+.layer-toolbar {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.layer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.layer-item {
+  background: #0f172a;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.layer-item.active {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 1px var(--accent-primary);
+}
+
+.layer-item-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.layer-color-picker {
+  -webkit-appearance: none;
+  border: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  cursor: pointer;
+  background: transparent;
+  padding: 0;
+}
+.layer-color-picker::-webkit-color-swatch-wrapper { padding: 0; }
+.layer-color-picker::-webkit-color-swatch { border: 1.5px solid #ffffff; border-radius: 50%; }
+
+.layer-name {
+  flex: 1;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-main);
+  outline: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.layer-name:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+.layer-name:focus {
+  background: rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--accent-primary);
+}
+
+.layer-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.btn-icon-sm {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+.btn-icon-sm:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.layer-item-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.layer-opacity-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.layer-opacity-slider {
+  width: 65px;
+  height: 4px;
+  accent-color: var(--accent-primary);
+}
+
 @keyframes slideIn {
   from { transform: translateX(100%); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }

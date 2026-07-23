@@ -27,6 +27,10 @@ const state = {
   displayStyle: 'BANDS', // 'BANDS' | 'STACKED' | 'OUTLINES'
   fetchStrategy: 'PARALLEL', // 'PARALLEL' | 'SEQUENTIAL' | 'MAX_ONLY'
   
+  // Multi-Layer Comparison System
+  layers: [],
+  activeLayerId: null,
+  
   // Results
   lastGeoJSON: null,
   lastRawResponse: null,
@@ -422,25 +426,31 @@ function bindEvents() {
     downloadFile(JSON.stringify(state.lastRawResponse, null, 2), filenameRaw, 'application/json');
   });
 
-  // File Import Action
-  const fileInput = document.getElementById('input-file-import');
-  if (fileInput) {
-    fileInput.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        try {
-          const parsed = JSON.parse(event.target.result);
-          handleImportedFileData(parsed, file.name);
-        } catch (err) {
-          showToast(`Failed to parse JSON file: ${err.message}`, 'error');
-        }
-      };
-      reader.readAsText(file);
+  // Multi-File Layer Import Actions
+  const fileInputHeader = document.getElementById('input-file-import');
+  if (fileInputHeader) {
+    fileInputHeader.addEventListener('change', (e) => {
+      handleImportedFiles(e.target.files);
       e.target.value = '';
     });
+  }
+
+  const fileInputLayers = document.getElementById('input-layer-files');
+  if (fileInputLayers) {
+    fileInputLayers.addEventListener('change', (e) => {
+      handleImportedFiles(e.target.files);
+      e.target.value = '';
+    });
+  }
+
+  const btnExportCombined = document.getElementById('btn-export-combined');
+  if (btnExportCombined) {
+    btnExportCombined.addEventListener('click', exportCombinedGeoJSON);
+  }
+
+  const btnClearAll = document.getElementById('btn-clear-all-layers');
+  if (btnClearAll) {
+    btnClearAll.addEventListener('click', clearAllLayers);
   }
 }
 
@@ -692,9 +702,12 @@ async function generateIsochrones() {
   state.lastGeoJSON = geojson;
   state.lastRawResponse = rawResponse;
 
-  // Render Map & Display
-  renderIsochronesOnMap(geojson);
-  updateCodeViews(geojson, rawResponse);
+  const maxDurationSec = state.durations && state.durations.length > 0 ? Math.max(...state.durations) : 600;
+  const maxMin = Math.round(maxDurationSec / 60);
+  const placeName = state.origin.name ? state.origin.name.split(',')[0] : 'Origin';
+  const layerName = `${state.travelMode} ${maxMin}m (${placeName})`;
+
+  addLayer(geojson, layerName, { rawResponse, source: 'generated' });
 }
 
 // Live Google Maps Isochrones API Fetcher (Supports Multi-Contour Durations & Strategies)
@@ -1075,125 +1088,368 @@ function buildMockGoogleAPIResponse(geojson) {
   };
 }
 
-// Render GeoJSON Isochrones on Leaflet Map (Supports Donut Ring Bands, Stacked, and Outlines)
-function renderIsochronesOnMap(geojson) {
-  // Clear existing layers
-  state.isochroneLayers.forEach(layer => state.map.removeLayer(layer));
-  state.isochroneLayers = [];
+// Multi-Layer Manager Core Functions
+function addLayer(geojson, name, options = {}) {
+  if (!geojson || !geojson.features || geojson.features.length === 0) return null;
+
+  const layerId = 'layer_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+  const paletteIndex = state.layers.length % CONTOUR_COLORS.length;
+  const defaultColor = options.color || CONTOUR_COLORS[paletteIndex].fill;
+
+  const layerObj = {
+    id: layerId,
+    name: name || `Isochrone Layer ${state.layers.length + 1}`,
+    visible: true,
+    color: defaultColor,
+    opacity: options.opacity || 0.35,
+    geojson,
+    rawResponse: options.rawResponse || null,
+    source: options.source || 'generated',
+    createdAt: new Date().toISOString(),
+    leafletGroup: L.featureGroup()
+  };
+
+  state.layers.push(layerObj);
+  state.activeLayerId = layerId;
+  state.lastGeoJSON = geojson;
+  if (options.rawResponse) state.lastRawResponse = options.rawResponse;
+
+  renderAllLayers();
+  renderLayerManagerUI();
+  updateCodeViews(geojson, state.lastRawResponse);
+  
+  return layerObj;
+}
+
+function removeLayer(layerId) {
+  const index = state.layers.findIndex(l => l.id === layerId);
+  if (index >= 0) {
+    const layerObj = state.layers[index];
+    if (layerObj.leafletGroup && state.map) {
+      state.map.removeLayer(layerObj.leafletGroup);
+    }
+    state.layers.splice(index, 1);
+    
+    if (state.activeLayerId === layerId) {
+      state.activeLayerId = state.layers.length > 0 ? state.layers[state.layers.length - 1].id : null;
+      if (state.activeLayerId) {
+        const activeLayer = state.layers.find(l => l.id === state.activeLayerId);
+        if (activeLayer) {
+          state.lastGeoJSON = activeLayer.geojson;
+          updateCodeViews(activeLayer.geojson, activeLayer.rawResponse);
+        }
+      } else {
+        state.lastGeoJSON = null;
+        document.getElementById('code-geojson-display').textContent = '// No layer loaded...';
+      }
+    }
+
+    renderAllLayers();
+    renderLayerManagerUI();
+    showToast(`Removed layer "${layerObj.name}"`);
+  }
+}
+
+function toggleLayerVisibility(layerId, visibleState) {
+  const layerObj = state.layers.find(l => l.id === layerId);
+  if (layerObj) {
+    layerObj.visible = typeof visibleState === 'boolean' ? visibleState : !layerObj.visible;
+    renderAllLayers();
+    renderLayerManagerUI();
+  }
+}
+
+function updateLayer(layerId, updates = {}) {
+  const layerObj = state.layers.find(l => l.id === layerId);
+  if (layerObj) {
+    if (updates.name !== undefined) layerObj.name = updates.name;
+    if (updates.color !== undefined) layerObj.color = updates.color;
+    if (updates.opacity !== undefined) layerObj.opacity = updates.opacity;
+
+    renderAllLayers();
+    renderLayerManagerUI();
+  }
+}
+
+function clearAllLayers() {
+  state.layers.forEach(layerObj => {
+    if (layerObj.leafletGroup && state.map) {
+      state.map.removeLayer(layerObj.leafletGroup);
+    }
+  });
+  state.layers = [];
+  state.activeLayerId = null;
+  state.lastGeoJSON = null;
+  state.lastRawResponse = null;
+
+  renderAllLayers();
+  renderLayerManagerUI();
+  document.getElementById('map-stats').classList.add('hidden');
+  document.getElementById('code-geojson-display').textContent = '// No active layer...';
+  showToast('Cleared all layers');
+}
+
+function zoomToLayer(layerId) {
+  const layerObj = state.layers.find(l => l.id === layerId);
+  if (layerObj && layerObj.leafletGroup && state.map) {
+    const bounds = layerObj.leafletGroup.getBounds();
+    if (bounds && bounds.isValid()) {
+      state.map.fitBounds(bounds, { padding: [40, 40] });
+    }
+  }
+}
+
+function renderAllLayers() {
+  if (!state.map) return;
+
+  // Clear all current leafletGroups from map
+  state.layers.forEach(l => {
+    if (l.leafletGroup) state.map.removeLayer(l.leafletGroup);
+    l.leafletGroup = L.featureGroup();
+  });
 
   const legendItemsContainer = document.getElementById('legend-items');
-  legendItemsContainer.innerHTML = '';
+  if (legendItemsContainer) legendItemsContainer.innerHTML = '';
 
-  if (!geojson || !geojson.features || geojson.features.length === 0) {
+  let totalContours = 0;
+  let maxAreaSum = 0;
+
+  const visibleLayers = state.layers.filter(l => l.visible);
+
+  visibleLayers.forEach(layerObj => {
+    const geojson = layerObj.geojson;
+    const styleMode = state.displayStyle || 'BANDS';
+    const sortedSmallToLarge = [...geojson.features].sort((a, b) => (a.properties.duration_seconds || 0) - (b.properties.duration_seconds || 0));
+
+    sortedSmallToLarge.forEach((feature, idx) => {
+      totalContours++;
+      const props = feature.properties;
+      if (props.area_sq_km > maxAreaSum) maxAreaSum = props.area_sq_km;
+
+      let displayGeom = feature.geometry;
+
+      if (styleMode === 'BANDS' && idx > 0 && typeof turf !== 'undefined') {
+        try {
+          const outerPoly = feature;
+          const innerPoly = sortedSmallToLarge[idx - 1];
+          const diff = turf.difference(outerPoly, innerPoly);
+          if (diff && diff.geometry) displayGeom = diff.geometry;
+        } catch (e) {}
+      }
+
+      let fillOp = layerObj.opacity !== undefined ? layerObj.opacity : 0.35;
+      let strokeW = 2.5;
+
+      if (styleMode === 'OUTLINES') {
+        fillOp = 0.06;
+        strokeW = 3.5;
+      }
+
+      const strokeColor = props.stroke_color || layerObj.color;
+      const fillColor = props.fill_color || layerObj.color;
+
+      const subLayer = L.geoJSON({
+        type: "Feature",
+        geometry: displayGeom,
+        properties: props
+      }, {
+        style: {
+          fillColor: fillColor,
+          fillOpacity: fillOp,
+          color: strokeColor,
+          weight: strokeW
+        }
+      });
+
+      subLayer.bindPopup(`
+        <div style="font-family: var(--font-sans); padding: 4px;">
+          <h4 style="margin: 0 0 4px 0; color: var(--accent-primary); font-size: 0.85rem;">
+            📂 ${layerObj.name}
+          </h4>
+          <h3 style="margin: 0 0 6px 0; color: ${strokeColor}; font-size: 1rem;">
+            ⏱️ ${props.duration_formatted || 'Isochrone Zone'}
+          </h3>
+          <p style="margin: 2px 0; font-size: 0.82rem;"><strong>Mode:</strong> ${props.travel_mode || state.travelMode}</p>
+          <p style="margin: 2px 0; font-size: 0.82rem;"><strong>Area:</strong> ${props.area_sq_km || 0} km²</p>
+        </div>
+      `);
+
+      layerObj.leafletGroup.addLayer(subLayer);
+    });
+
+    layerObj.leafletGroup.addTo(state.map);
+
+    // Legend item for layer
+    if (legendItemsContainer) {
+      const legendItem = document.createElement('div');
+      legendItem.className = 'legend-item';
+      legendItem.innerHTML = `
+        <div class="legend-item-left">
+          <span class="color-swatch" style="background-color: ${layerObj.color}; border-color: #ffffff;"></span>
+          <span style="font-weight: 600;">${layerObj.name}</span>
+        </div>
+        <span class="text-muted" style="font-size: 0.72rem;">${layerObj.geojson.features.length} zones</span>
+      `;
+      legendItemsContainer.appendChild(legendItem);
+    }
+  });
+
+  // Update Stats Overlay
+  if (visibleLayers.length > 0) {
+    document.getElementById('stat-contours').textContent = totalContours;
+    document.getElementById('stat-max-area').textContent = `${maxAreaSum} km²`;
+    document.getElementById('stat-mode').textContent = `${visibleLayers.length} Layer(s)`;
+    document.getElementById('map-stats').classList.remove('hidden');
+  } else {
     document.getElementById('map-stats').classList.add('hidden');
+  }
+}
+
+function renderLayerManagerUI() {
+  const container = document.getElementById('layer-list');
+  const countBadge = document.getElementById('layer-count-badge');
+  if (!container) return;
+
+  if (countBadge) countBadge.textContent = state.layers.length;
+
+  if (state.layers.length === 0) {
+    container.innerHTML = `
+      <div class="empty-layers-msg text-muted" style="text-align: center; padding: 12px; font-size: 0.8rem;">
+        No layers loaded. Click "Generate" or "Add Files" to compare Isochrones.
+      </div>
+    `;
     return;
   }
 
-  let maxArea = 0;
-  const styleMode = state.displayStyle || 'BANDS';
+  container.innerHTML = '';
 
-  // Sort features from SMALLEST duration to LARGEST duration
-  const sortedSmallToLarge = [...geojson.features].sort((a, b) => (a.properties.duration_seconds || 0) - (b.properties.duration_seconds || 0));
+  state.layers.forEach(layerObj => {
+    const item = document.createElement('div');
+    item.className = `layer-item ${state.activeLayerId === layerObj.id ? 'active' : ''}`;
+    item.dataset.layerId = layerObj.id;
 
-  // Compute display features based on style mode
-  const displayItems = sortedSmallToLarge.map((feature, idx) => {
-    const props = feature.properties;
-    if (props.area_sq_km > maxArea) maxArea = props.area_sq_km;
+    const contourCount = layerObj.geojson.features ? layerObj.geojson.features.length : 0;
+    const firstProps = (layerObj.geojson.features && layerObj.geojson.features[0]) ? layerObj.geojson.features[0].properties : {};
+    const modeText = firstProps.travel_mode || layerObj.source;
 
-    let displayGeom = feature.geometry;
-
-    // In BANDS mode, subtract inner polygon from outer polygon so colors do NOT overlap/blend!
-    if (styleMode === 'BANDS' && idx > 0 && typeof turf !== 'undefined') {
-      try {
-        const outerPoly = feature;
-        const innerPoly = sortedSmallToLarge[idx - 1];
-        const diff = turf.difference(outerPoly, innerPoly);
-        if (diff && diff.geometry) {
-          displayGeom = diff.geometry;
-        }
-      } catch (e) {
-        displayGeom = feature.geometry;
-      }
-    }
-
-    return {
-      originalFeature: feature,
-      displayGeom,
-      props
-    };
-  });
-
-  // For STACKED style, render largest to smallest so smaller sits on top.
-  const renderList = styleMode === 'STACKED' ? [...displayItems].reverse() : displayItems;
-
-  renderList.forEach((item) => {
-    const props = item.props;
-
-    let fillOp = 0.45;
-    let strokeW = 2.5;
-
-    if (styleMode === 'OUTLINES') {
-      fillOp = 0.06;
-      strokeW = 3.5;
-    } else if (styleMode === 'STACKED') {
-      fillOp = 0.35;
-      strokeW = 2;
-    }
-
-    const layer = L.geoJSON({
-      type: "Feature",
-      geometry: item.displayGeom,
-      properties: props
-    }, {
-      style: {
-        fillColor: props.fill_color,
-        fillOpacity: fillOp,
-        color: props.stroke_color,
-        weight: strokeW
-      }
-    }).addTo(state.map);
-
-    // Popup card
-    layer.bindPopup(`
-      <div style="font-family: var(--font-sans); padding: 4px;">
-        <h3 style="margin: 0 0 6px 0; color: ${props.stroke_color}; font-size: 1rem;">
-          ⏱️ ${props.duration_formatted} Zone
-        </h3>
-        <p style="margin: 2px 0; font-size: 0.82rem;"><strong>Mode:</strong> ${props.travel_mode}</p>
-        <p style="margin: 2px 0; font-size: 0.82rem;"><strong>Direction:</strong> ${props.travel_direction}</p>
-        <p style="margin: 2px 0; font-size: 0.82rem;"><strong>Area:</strong> ${props.area_sq_km} km²</p>
+    item.innerHTML = `
+      <div class="layer-item-header">
+        <input type="checkbox" class="layer-visibility-toggle" ${layerObj.visible ? 'checked' : ''} title="Toggle visibility">
+        <input type="color" class="layer-color-picker" value="${layerObj.color}" title="Change color scheme">
+        <span class="layer-name" contenteditable="true" title="Click to rename">${layerObj.name}</span>
+        <div class="layer-actions">
+          <button type="button" class="btn-icon-sm btn-zoom" title="Fit map to layer"><i class="fa-solid fa-expand"></i></button>
+          <button type="button" class="btn-icon-sm text-rose btn-delete" title="Delete layer"><i class="fa-solid fa-xmark"></i></button>
+        </div>
       </div>
-    `);
-
-    state.isochroneLayers.push(layer);
-  });
-
-  // Render Legend Items (Ordered smallest to largest duration)
-  sortedSmallToLarge.forEach((feature) => {
-    const props = feature.properties;
-    const legendItem = document.createElement('div');
-    legendItem.className = 'legend-item';
-    legendItem.innerHTML = `
-      <div class="legend-item-left">
-        <span class="color-swatch" style="background-color: ${props.fill_color}; border-color: ${props.stroke_color};"></span>
-        <span>${props.duration_formatted}</span>
+      <div class="layer-item-details">
+        <span>${contourCount} contour(s) • ${modeText}</span>
+        <div class="layer-opacity-row">
+          <span>Op:</span>
+          <input type="range" class="layer-opacity-slider" min="0.05" max="1" step="0.05" value="${layerObj.opacity}">
+        </div>
       </div>
-      <span class="text-muted" style="font-size: 0.72rem;">${props.area_sq_km} km²</span>
     `;
-    legendItemsContainer.appendChild(legendItem);
+
+    const checkbox = item.querySelector('.layer-visibility-toggle');
+    checkbox.addEventListener('change', (e) => toggleLayerVisibility(layerObj.id, e.target.checked));
+
+    const colorPicker = item.querySelector('.layer-color-picker');
+    colorPicker.addEventListener('change', (e) => updateLayer(layerObj.id, { color: e.target.value }));
+
+    const nameSpan = item.querySelector('.layer-name');
+    nameSpan.addEventListener('blur', (e) => updateLayer(layerObj.id, { name: e.target.innerText.trim() }));
+    nameSpan.addEventListener('keypress', (e) => { if (e.key === 'Enter') e.target.blur(); });
+
+    const opacitySlider = item.querySelector('.layer-opacity-slider');
+    opacitySlider.addEventListener('input', (e) => updateLayer(layerObj.id, { opacity: parseFloat(e.target.value) }));
+
+    const zoomBtn = item.querySelector('.btn-zoom');
+    zoomBtn.addEventListener('click', () => zoomToLayer(layerObj.id));
+
+    const deleteBtn = item.querySelector('.btn-delete');
+    deleteBtn.addEventListener('click', () => removeLayer(layerObj.id));
+
+    item.addEventListener('click', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.closest('.layer-actions') || e.target.classList.contains('layer-name')) return;
+      state.activeLayerId = layerObj.id;
+      state.lastGeoJSON = layerObj.geojson;
+      renderLayerManagerUI();
+      updateCodeViews(layerObj.geojson, layerObj.rawResponse);
+    });
+
+    container.appendChild(item);
+  });
+}
+
+function handleImportedFiles(fileList) {
+  if (!fileList || fileList.length === 0) return;
+
+  const fileArray = Array.from(fileList);
+  showToast(`Importing ${fileArray.length} file(s)...`, 'info');
+
+  fileArray.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const parsed = JSON.parse(event.target.result);
+        const geojson = convertToStandardGeoJSON(parsed, file.name);
+        if (geojson && geojson.features && geojson.features.length > 0) {
+          const cleanName = file.name.replace(/\.[^/.]+$/, "");
+          addLayer(geojson, cleanName, { source: 'imported' });
+          showToast(`Imported "${cleanName}" (${geojson.features.length} zones)`, 'success');
+        } else {
+          showToast(`No valid geometry in "${file.name}"`, 'error');
+        }
+      } catch (err) {
+        showToast(`Error reading "${file.name}": ${err.message}`, 'error');
+      }
+    };
+    reader.readAsText(file);
+  });
+}
+
+function exportCombinedGeoJSON() {
+  const visibleLayers = state.layers.filter(l => l.visible);
+  if (visibleLayers.length === 0) {
+    showToast('No active layers to export.', 'error');
+    return;
+  }
+
+  const combinedFeatures = [];
+  visibleLayers.forEach(l => {
+    if (l.geojson && l.geojson.features) {
+      l.geojson.features.forEach(f => {
+        combinedFeatures.push({
+          ...f,
+          properties: {
+            ...f.properties,
+            layer_name: l.name,
+            layer_color: l.color
+          }
+        });
+      });
+    }
   });
 
-  // Update Stats Card
-  document.getElementById('stat-contours').textContent = geojson.features.length;
-  document.getElementById('stat-max-area').textContent = `${maxArea} km²`;
-  document.getElementById('stat-mode').textContent = state.travelMode;
-  document.getElementById('map-stats').classList.remove('hidden');
+  const combinedGeoJSON = {
+    type: "FeatureCollection",
+    properties: {
+      generated_by: "Google Maps Isochrones API Studio - Multi-Layer Comparison",
+      exported_layers_count: visibleLayers.length,
+      created_at: new Date().toISOString()
+    },
+    features: combinedFeatures
+  };
 
-  // Fit map bounds to outer contour
-  if (state.isochroneLayers.length > 0) {
-    const group = L.featureGroup(state.isochroneLayers);
-    state.map.fitBounds(group.getBounds(), { padding: [40, 40] });
-  }
+  const filename = `isochrones_multi_layer_comparison_${Date.now()}.geojson`;
+  downloadFile(JSON.stringify(combinedGeoJSON, null, 2), filename, 'application/geo+json');
+}
+
+// Render GeoJSON Isochrones on Leaflet Map
+// Render GeoJSON Isochrones on Leaflet Map
+function renderIsochronesOnMap(geojson) {
+  renderAllLayers();
 }
 
 // Update Code Viewers (GeoJSON, cURL, Raw Response)

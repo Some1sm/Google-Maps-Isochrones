@@ -294,6 +294,35 @@
           </div>
         </section>
 
+        <!-- Card 6: Layer Comparison Manager -->
+        <section class="card" id="card-layer-manager">
+          <div class="card-header">
+            <i class="fa-solid fa-layer-group text-accent"></i>
+            <h2>Layers (<span id="layer-count-badge">0</span>)</h2>
+            <i class="fa-solid fa-chevron-down card-toggle-icon" style="margin-left: auto; font-size: 0.8rem; color: var(--text-muted);"></i>
+          </div>
+          <div class="card-body">
+            <div class="layer-toolbar margin-bottom-xs">
+              <label class="btn btn-secondary btn-sm" style="cursor: pointer; flex: 1;" title="Import multiple GeoJSON files">
+                <i class="fa-solid fa-file-circle-plus"></i> Add Files
+                <input type="file" id="input-layer-files" accept=".geojson,.json" multiple style="display: none;">
+              </label>
+              <button type="button" class="btn btn-secondary btn-sm" id="btn-export-combined" title="Export all active layers to single GeoJSON">
+                <i class="fa-solid fa-file-export"></i> Export All
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm text-rose" id="btn-clear-all-layers" title="Remove all layers">
+                <i class="fa-solid fa-trash-can"></i> Clear
+              </button>
+            </div>
+
+            <div class="layer-list" id="layer-list">
+              <div class="empty-layers-msg text-muted" style="text-align: center; padding: 12px; font-size: 0.8rem;">
+                No layers loaded. Click "Generate" or "Add Files" to compare Isochrones.
+              </div>
+            </div>
+          </div>
+        </section>
+
       </div>
     </aside>
 
@@ -408,6 +437,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
 
   <!-- Main JavaScript App -->
-  <script src="app.js?v=1.0.6"></script>
+  <script src="app.js?v=1.0.7"></script>
 </body>
 </html>
