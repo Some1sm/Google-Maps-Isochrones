@@ -21,7 +21,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
 
   <!-- App Styles -->
-  <link rel="stylesheet" href="style.css?v=2.0.7">
+  <link rel="stylesheet" href="style.css?v=2.0.8">
 </head>
 <body class="dark-theme">
 
@@ -280,11 +280,10 @@
             </div>
 
             <div class="form-group">
-              <label for="basemap-style">Base Map &amp; Label Layer</label>
+              <label for="basemap-style">Base Map</label>
               <select id="basemap-style">
-                <option value="DARK_LABELS_TOP" selected>Dark (Bright Labels on Top)</option>
-                <option value="DARK_MATTER_LABELS">Dark (Subtle Labels on Top)</option>
-                <option value="LIGHT_LABELS_TOP">Light (Bright Labels on Top)</option>
+                <option value="DARK" selected>Dark</option>
+                <option value="LIGHT">Light</option>
                 <option value="SATELLITE_HYBRID">Satellite Hybrid</option>
               </select>
             </div>
@@ -434,6 +433,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
 
   <!-- Main JavaScript App -->
-  <script src="app.js?v=2.0.7"></script>
+  <script src="app.js?v=2.0.8"></script>
 </body>
 </html>

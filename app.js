@@ -24,7 +24,7 @@ const state = {
   polygonFidelity: 'HIGH',
   displayStyle: 'BANDS', // 'BANDS' | 'STACKED' | 'OUTLINES'
   fetchStrategy: 'PARALLEL', // 'PARALLEL' | 'SEQUENTIAL' | 'MAX_ONLY'
-  basemapStyle: localStorage.getItem('gmaps_isochrones_basemap') || 'DARK_LABELS_TOP',
+  basemapStyle: localStorage.getItem('gmaps_isochrones_basemap') || 'DARK',
   baseTileLayer: null,
   labelTileLayer: null,
 
@@ -86,31 +86,25 @@ function initDOMReferences() {
 // Basemap configurations: separate base + label tile URLs
 // Labels are rendered in their own high-z pane so they always show ABOVE isochrone polygons
 const BASEMAP_TILES = {
-  DARK_LABELS_TOP: {
-    base: 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
-    labels: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png',
-    subdomains: 'abcd',
-    labelSubdomains: 'abcd',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-  },
-  DARK_MATTER_LABELS: {
+  DARK: {
+    // Dark basemap + CartoDB dark_only_labels (white text, built for dark backgrounds)
     base: 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
     labels: 'https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',
     subdomains: 'abcd',
     labelSubdomains: 'abcd',
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
   },
-  LIGHT_LABELS_TOP: {
+  LIGHT: {
+    // Light basemap + CartoDB light_only_labels (dark text, built for light backgrounds)
     base: 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
-    labels: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png',
+    labels: 'https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png',
     subdomains: 'abcd',
     labelSubdomains: 'abcd',
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
   },
   SATELLITE_HYBRID: {
-    // Esri World Imagery as base (no subdomains)
+    // Esri World Imagery base + Esri reference labels (white text with halos for satellite)
     base: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    // Esri World Boundaries & Places: white text with dark halos — designed for satellite readability (no subdomains)
     labels: 'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
     subdomains: '',
     labelSubdomains: '',
@@ -121,7 +115,7 @@ const BASEMAP_TILES = {
 // Apply a basemap style: base tiles below polygons, label tiles above polygons
 function setBasemapStyle(styleKey) {
   if (!state.map) return;
-  const config = BASEMAP_TILES[styleKey] || BASEMAP_TILES.DARK_LABELS_TOP;
+  const config = BASEMAP_TILES[styleKey] || BASEMAP_TILES.DARK;
 
   // Remove old base + label layers
   if (state.baseTileLayer) { state.map.removeLayer(state.baseTileLayer); state.baseTileLayer = null; }
@@ -165,7 +159,7 @@ function initMap() {
   state.map.getPane('labelsPane').style.pointerEvents = 'none';
 
   // Load saved or default basemap
-  setBasemapStyle(state.basemapStyle || 'DARK_LABELS_TOP');
+  setBasemapStyle(state.basemapStyle || 'DARK');
 
   // Custom Origin Marker Icon
   const originIcon = L.divIcon({
@@ -437,7 +431,7 @@ function bindEvents() {
 
   const basemapSelect = document.getElementById('basemap-style');
   if (basemapSelect) {
-    basemapSelect.value = state.basemapStyle || 'DARK_LABELS_TOP';
+    basemapSelect.value = state.basemapStyle || 'DARK';
     basemapSelect.addEventListener('change', (e) => {
       setBasemapStyle(e.target.value);
     });
