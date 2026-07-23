@@ -1035,3 +1035,36 @@ input:checked + .slider:before {
     padding: 8px;
   }
 }
+
+/* Map Overlay Clickable Styles */
+.map-legend-card,
+.map-stats-card {
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+}
+
+.map-legend-card:hover,
+.map-stats-card:hover {
+  border-color: var(--accent-primary);
+  box-shadow: 0 4px 16px rgba(56, 189, 248, 0.35);
+}
+
+/* Card Highlight Pulse Animation */
+@keyframes cardHighlightPulse {
+  0% {
+    border-color: var(--border-color);
+    box-shadow: var(--shadow-sm);
+  }
+  50% {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 24px rgba(56, 189, 248, 0.75), inset 0 0 14px rgba(56, 189, 248, 0.3);
+  }
+  100% {
+    border-color: var(--border-color);
+    box-shadow: var(--shadow-sm);
+  }
+}
+
+.card-highlight-pulse {
+  animation: cardHighlightPulse 1.5s ease-in-out;
+}

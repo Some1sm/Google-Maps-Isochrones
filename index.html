@@ -21,7 +21,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
 
   <!-- App Styles -->
-  <link rel="stylesheet" href="style.css?v=2.0.0">
+  <link rel="stylesheet" href="style.css?v=2.0.3">
 </head>
 <body class="dark-theme">
 
@@ -231,19 +231,6 @@
             </div>
 
             <div class="form-group">
-              <label for="departure-time-option">Time Condition</label>
-              <select id="departure-time-option">
-                <option value="NOW" selected>Depart Now (Current Timestamp)</option>
-                <option value="CUSTOM">Specific Date / Time</option>
-              </select>
-            </div>
-
-            <div class="form-group hidden" id="custom-time-container">
-              <label for="custom-datetime">Departure / Arrival Timestamp</label>
-              <input type="datetime-local" id="custom-datetime">
-            </div>
-
-            <div class="form-group">
               <label>Route Modifiers / Avoidances</label>
               <div class="checkbox-list">
                 <label class="checkbox-row"><input type="checkbox" id="avoid-tolls"> Avoid Tolls (avoidTolls)</label>
@@ -437,6 +424,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
 
   <!-- Main JavaScript App -->
-  <script src="app.js?v=2.0.2&t=1784833700"></script>
+  <script src="app.js?v=2.0.3"></script>
 </body>
 </html>

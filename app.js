@@ -17,8 +17,6 @@ const state = {
   travelDirection: 'FROM',
   durations: [300, 600, 900], // in seconds
   routingPreference: 'TRAFFIC_AWARE',
-  departureTimeOption: 'NOW',
-  customDatetime: '',
   avoidTolls: false,
   avoidHighways: false,
   avoidFerries: false,
@@ -318,22 +316,35 @@ function bindEvents() {
     state.routingPreference = e.target.value;
   });
 
-  // Time Condition
-  document.getElementById('departure-time-option').addEventListener('change', (e) => {
-    state.departureTimeOption = e.target.value;
-    const customContainer = document.getElementById('custom-time-container');
-    if (state.departureTimeOption === 'CUSTOM') {
-      customContainer.classList.remove('hidden');
-    } else {
-      customContainer.classList.add('hidden');
-    }
-  });
+  // Map overlay stats & legend click handlers to scroll sidebar to #card-layer-manager
+  const scrollToLayerManager = () => {
+    const layerCard = document.getElementById('card-layer-manager');
+    if (!layerCard) return;
 
-  const customDtInput = document.getElementById('custom-datetime');
-  if (customDtInput) {
-    customDtInput.addEventListener('change', (e) => {
-      state.customDatetime = e.target.value;
-    });
+    const sidebar = document.querySelector('.sidebar');
+    if (sidebar && window.innerWidth <= 768) {
+      sidebar.classList.add('mobile-open');
+    }
+
+    layerCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    layerCard.classList.remove('card-highlight-pulse');
+    void layerCard.offsetWidth; // Trigger reflow to restart animation
+    layerCard.classList.add('card-highlight-pulse');
+
+    setTimeout(() => {
+      layerCard.classList.remove('card-highlight-pulse');
+    }, 1500);
+  };
+
+  const mapStats = document.getElementById('map-stats');
+  if (mapStats) {
+    mapStats.addEventListener('click', scrollToLayerManager);
+  }
+
+  const mapLegend = document.getElementById('map-legend');
+  if (mapLegend) {
+    mapLegend.addEventListener('click', scrollToLayerManager);
   }
 
   // Avoidances & Smoothing & Fidelity
