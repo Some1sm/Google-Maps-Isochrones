@@ -21,7 +21,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
 
   <!-- App Styles -->
-  <link rel="stylesheet" href="style.css?v=2.0.5">
+  <link rel="stylesheet" href="style.css?v=2.0.6">
 </head>
 <body class="dark-theme">
 
@@ -280,18 +280,18 @@
             </div>
 
             <div class="form-group">
-              <label for="basemap-style">Base Map & Label Layer</label>
+              <label for="basemap-style">Base Map &amp; Label Layer</label>
               <select id="basemap-style">
-                <option value="DARK_LABELS_TOP" selected>🌙 Dark Map (Bright Labels Over Polygons)</option>
-                <option value="DARK_MATTER_LABELS">🌙 Dark Map (Subtle Dark Labels Over Polygons)</option>
-                <option value="LIGHT_LABELS_TOP">☀️ Light Map (Bright Labels Over Polygons)</option>
-                <option value="SATELLITE_HYBRID">🛰️ Satellite Hybrid (Labels Over Polygons)</option>
+                <option value="DARK_LABELS_TOP" selected>🌙 Dark (Bright Labels on Top)</option>
+                <option value="DARK_MATTER_LABELS">🌙 Dark (Subtle Labels on Top)</option>
+                <option value="LIGHT_LABELS_TOP">☀️ Light (Bright Labels on Top)</option>
+                <option value="SATELLITE_HYBRID">🛰️ Satellite Hybrid</option>
               </select>
             </div>
           </div>
         </section>
 
-        <!-- Card 6: Layer Comparison Manager -->
+        <!-- Card 7: Layer Comparison Manager -->
         <section class="card" id="card-layer-manager">
           <div class="card-header">
             <i class="fa-solid fa-layer-group text-accent"></i>
@@ -434,6 +434,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
 
   <!-- Main JavaScript App -->
-  <script src="app.js?v=2.0.5"></script>
+  <script src="app.js?v=2.0.6"></script>
 </body>
 </html>
