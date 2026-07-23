@@ -21,7 +21,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
 
   <!-- App Styles -->
-  <link rel="stylesheet" href="style.css?v=2.0.4">
+  <link rel="stylesheet" href="style.css?v=2.0.5">
 </head>
 <body class="dark-theme">
 
@@ -278,6 +278,16 @@
                 <option value="OUTLINES">Hollow High-Contrast Outlines Only</option>
               </select>
             </div>
+
+            <div class="form-group">
+              <label for="basemap-style">Base Map & Label Layer</label>
+              <select id="basemap-style">
+                <option value="DARK_LABELS_TOP" selected>🌙 Dark Map (Bright Labels Over Polygons)</option>
+                <option value="DARK_MATTER_LABELS">🌙 Dark Map (Subtle Dark Labels Over Polygons)</option>
+                <option value="LIGHT_LABELS_TOP">☀️ Light Map (Bright Labels Over Polygons)</option>
+                <option value="SATELLITE_HYBRID">🛰️ Satellite Hybrid (Labels Over Polygons)</option>
+              </select>
+            </div>
           </div>
         </section>
 
@@ -424,6 +434,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
 
   <!-- Main JavaScript App -->
-  <script src="app.js?v=2.0.4"></script>
+  <script src="app.js?v=2.0.5"></script>
 </body>
 </html>

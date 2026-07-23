@@ -24,7 +24,10 @@ const state = {
   polygonFidelity: 'HIGH',
   displayStyle: 'BANDS', // 'BANDS' | 'STACKED' | 'OUTLINES'
   fetchStrategy: 'PARALLEL', // 'PARALLEL' | 'SEQUENTIAL' | 'MAX_ONLY'
-  
+  basemapStyle: localStorage.getItem('gmaps_isochrones_basemap') || 'DARK_LABELS_TOP',
+  baseTileLayer: null,
+  labelTileLayer: null,
+
   // Multi-Layer Comparison System
   layers: [],
   activeLayerId: null,
@@ -80,6 +83,61 @@ function initDOMReferences() {
   }
 }
 
+// Basemap configurations: separate base + label tile URLs
+// Labels are rendered in their own high-z pane so they always show ABOVE isochrone polygons
+const BASEMAP_TILES = {
+  DARK_LABELS_TOP: {
+    base: 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
+    labels: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+  },
+  DARK_MATTER_LABELS: {
+    base: 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
+    labels: 'https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+  },
+  LIGHT_LABELS_TOP: {
+    base: 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
+    labels: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+  },
+  SATELLITE_HYBRID: {
+    base: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    labels: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png',
+    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+  }
+};
+
+// Apply a basemap style: base tiles below polygons, label tiles above polygons
+function setBasemapStyle(styleKey) {
+  if (!state.map) return;
+  const config = BASEMAP_TILES[styleKey] || BASEMAP_TILES.DARK_LABELS_TOP;
+
+  // Remove old base + label layers
+  if (state.baseTileLayer) { state.map.removeLayer(state.baseTileLayer); state.baseTileLayer = null; }
+  if (state.labelTileLayer) { state.map.removeLayer(state.labelTileLayer); state.labelTileLayer = null; }
+
+  // Add base tiles (default pane, z-index ~200, BELOW polygon overlayPane z-index 400)
+  state.baseTileLayer = L.tileLayer(config.base, {
+    attribution: config.attribution,
+    subdomains: 'abcd',
+    maxZoom: 19
+  }).addTo(state.map);
+
+  // Add label tiles into the custom labelsPane (z-index 650, ABOVE polygon overlayPane)
+  if (config.labels && state.map.getPane('labelsPane')) {
+    state.labelTileLayer = L.tileLayer(config.labels, {
+      subdomains: 'abcd',
+      maxZoom: 19,
+      pane: 'labelsPane',
+      opacity: 1
+    }).addTo(state.map);
+  }
+
+  state.basemapStyle = styleKey;
+  localStorage.setItem('gmaps_isochrones_basemap', styleKey);
+}
+
 // Initialize Leaflet Map
 function initMap() {
   state.map = L.map('map', {
@@ -89,12 +147,15 @@ function initMap() {
   // Position Zoom Control to top-left
   L.control.zoom({ position: 'topleft' }).addTo(state.map);
 
-  // Dark Map Tiles (CartoDB Dark Matter)
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-    subdomains: 'abcd',
-    maxZoom: 19
-  }).addTo(state.map);
+  // Create a dedicated pane for city/street labels so they render ABOVE isochrone polygons
+  // Leaflet overlayPane = 400; we set labelsPane to 650 so labels float above polygons
+  state.map.createPane('labelsPane');
+  state.map.getPane('labelsPane').style.zIndex = 650;
+  // Make the pane click-through so users can still click on map polygons
+  state.map.getPane('labelsPane').style.pointerEvents = 'none';
+
+  // Load saved or default basemap
+  setBasemapStyle(state.basemapStyle || 'DARK_LABELS_TOP');
 
   // Custom Origin Marker Icon
   const originIcon = L.divIcon({
@@ -361,6 +422,14 @@ function bindEvents() {
       if (state.lastGeoJSON) {
         renderIsochronesOnMap(state.lastGeoJSON);
       }
+    });
+  }
+
+  const basemapSelect = document.getElementById('basemap-style');
+  if (basemapSelect) {
+    basemapSelect.value = state.basemapStyle || 'DARK_LABELS_TOP';
+    basemapSelect.addEventListener('change', (e) => {
+      setBasemapStyle(e.target.value);
     });
   }
 
