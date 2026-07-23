@@ -89,21 +89,31 @@ const BASEMAP_TILES = {
   DARK_LABELS_TOP: {
     base: 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
     labels: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png',
+    subdomains: 'abcd',
+    labelSubdomains: 'abcd',
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
   },
   DARK_MATTER_LABELS: {
     base: 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
     labels: 'https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',
+    subdomains: 'abcd',
+    labelSubdomains: 'abcd',
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
   },
   LIGHT_LABELS_TOP: {
     base: 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
     labels: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png',
+    subdomains: 'abcd',
+    labelSubdomains: 'abcd',
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
   },
   SATELLITE_HYBRID: {
+    // Esri World Imagery as base (no subdomains)
     base: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    labels: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png',
+    // Esri World Boundaries & Places: white text with dark halos — designed for satellite readability (no subdomains)
+    labels: 'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+    subdomains: '',
+    labelSubdomains: '',
     attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
   }
 };
@@ -120,15 +130,15 @@ function setBasemapStyle(styleKey) {
   // Add base tiles (default pane, z-index ~200, BELOW polygon overlayPane z-index 400)
   state.baseTileLayer = L.tileLayer(config.base, {
     attribution: config.attribution,
-    subdomains: 'abcd',
-    maxZoom: 19
+    subdomains: config.subdomains || 'abcd',
+    maxZoom: 20
   }).addTo(state.map);
 
   // Add label tiles into the custom labelsPane (z-index 650, ABOVE polygon overlayPane)
   if (config.labels && state.map.getPane('labelsPane')) {
     state.labelTileLayer = L.tileLayer(config.labels, {
-      subdomains: 'abcd',
-      maxZoom: 19,
+      subdomains: config.labelSubdomains || '',
+      maxZoom: 20,
       pane: 'labelsPane',
       opacity: 1
     }).addTo(state.map);
