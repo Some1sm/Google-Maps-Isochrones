@@ -724,21 +724,6 @@ async function fetchGoogleIsochronesAPI() {
       payload.routingPreference = state.routingPreference;
     }
 
-    // Departure Time (ISO 8601 string for specific Date/Time)
-    if (state.departureTimeOption === 'CUSTOM' && state.customDatetime) {
-      try {
-        payload.departureTime = new Date(state.customDatetime).toISOString();
-      } catch (e) {}
-    }
-
-    // Route Modifiers / Avoidances
-    if (state.avoidTolls || state.avoidHighways || state.avoidFerries) {
-      payload.routeModifiers = {};
-      if (state.avoidTolls) payload.routeModifiers.avoidTolls = true;
-      if (state.avoidHighways) payload.routeModifiers.avoidHighways = true;
-      if (state.avoidFerries) payload.routeModifiers.avoidFerries = true;
-    }
-
     if (state.placeId) {
       payload.location = {
         place: state.placeId.startsWith('places/') ? state.placeId : `places/${state.placeId}`
@@ -1237,21 +1222,6 @@ function updateCodeViews(geojson, rawResponse) {
 
   if (state.travelMode === 'DRIVE') {
     payloadObj.routingPreference = state.routingPreference;
-  }
-
-  // Include Departure Time if custom date/time is set
-  if (state.departureTimeOption === 'CUSTOM' && state.customDatetime) {
-    try {
-      payloadObj.departureTime = new Date(state.customDatetime).toISOString();
-    } catch (e) {}
-  }
-
-  // Include Route Modifiers / Avoidances
-  if (state.avoidTolls || state.avoidHighways || state.avoidFerries) {
-    payloadObj.routeModifiers = {};
-    if (state.avoidTolls) payloadObj.routeModifiers.avoidTolls = true;
-    if (state.avoidHighways) payloadObj.routeModifiers.avoidHighways = true;
-    if (state.avoidFerries) payloadObj.routeModifiers.avoidFerries = true;
   }
 
   const curlCommand = `curl -X POST "https://isochrones.googleapis.com/v1/isochrones:generate" \\
