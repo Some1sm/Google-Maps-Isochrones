@@ -387,7 +387,13 @@ function bindEvents() {
     copyToClipboard(JSON.stringify(state.lastGeoJSON, null, 2), 'GeoJSON copied to clipboard!');
   });
   document.getElementById('btn-download-geojson').addEventListener('click', () => {
-    downloadFile(JSON.stringify(state.lastGeoJSON, null, 2), `isochrone_${state.travelMode.toLowerCase()}_${Date.now()}.geojson`, 'application/geo+json');
+    if (!state.lastGeoJSON) {
+      showToast('No GeoJSON to download. Please generate isochrones first.', 'error');
+      return;
+    }
+    const maxDurationSec = state.durations && state.durations.length > 0 ? Math.max(...state.durations) : 600;
+    const filename = `isochrone_${state.travelMode.toLowerCase()}_${maxDurationSec}s_${state.origin.lat}_${state.origin.lng}.geojson`;
+    downloadFile(JSON.stringify(state.lastGeoJSON, null, 2), filename, 'application/geo+json');
   });
 
   document.getElementById('btn-copy-curl').addEventListener('click', () => {
@@ -538,52 +544,77 @@ function updateDurationsFromUI() {
   state.durations = values.length > 0 ? values : [600];
 }
 
-// Request User's Current GPS Location via Browser Geolocation API
+// Request User's Current GPS Location via Browser Geolocation API (with IP fallback)
 function requestCurrentLocation() {
   if (!navigator.geolocation) {
-    showToast('Geolocation is not supported by your browser.', 'error');
+    fallbackToIPLocation('Geolocation API not supported by browser.');
     return;
   }
 
   showToast('Requesting GPS location permission...', 'info');
 
+  const onSucc = (position) => {
+    const lat = parseFloat(position.coords.latitude.toFixed(6));
+    const lng = parseFloat(position.coords.longitude.toFixed(6));
+    updateOriginFromGPS(lat, lng, 'Current GPS Location');
+  };
+
+  const onErr = (err) => {
+    let msg = 'Browser GPS unavailable, retrieving location via IP...';
+    if (err.code === err.PERMISSION_DENIED) {
+      msg = 'GPS permission denied. Retrieving location via IP...';
+    }
+    showToast(msg, 'warning');
+    fallbackToIPLocation();
+  };
+
   navigator.geolocation.getCurrentPosition(
-    (position) => {
-      const lat = parseFloat(position.coords.latitude.toFixed(6));
-      const lng = parseFloat(position.coords.longitude.toFixed(6));
-
-      state.origin.lat = lat;
-      state.origin.lng = lng;
-      state.origin.name = 'Current GPS Location';
-      state.placeId = '';
-
-      document.getElementById('origin-lat').value = lat;
-      document.getElementById('origin-lng').value = lng;
-      document.getElementById('place-id').value = '';
-      document.getElementById('location-search').value = `GPS: (${lat}, ${lng})`;
-
-      if (state.originMarker) {
-        state.originMarker.setLatLng([lat, lng]);
-      }
-      if (state.map) {
-        state.map.setView([lat, lng], 14);
-      }
-
-      showToast(`GPS location acquired: (${lat}, ${lng})`, 'success');
+    onSucc,
+    () => {
+      // Fallback try without high accuracy
+      navigator.geolocation.getCurrentPosition(onSucc, onErr, { enableHighAccuracy: false, timeout: 5000 });
     },
-    (err) => {
-      let msg = 'Failed to obtain GPS location.';
-      if (err.code === err.PERMISSION_DENIED) {
-        msg = 'Location permission denied by browser/user.';
-      } else if (err.code === err.POSITION_UNAVAILABLE) {
-        msg = 'GPS location position unavailable.';
-      } else if (err.code === err.TIMEOUT) {
-        msg = 'GPS location request timed out.';
-      }
-      showToast(msg, 'error');
-    },
-    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 }
   );
+}
+
+// IP-based Geolocation Fallback
+async function fallbackToIPLocation(reasonMsg = null) {
+  if (reasonMsg) showToast(reasonMsg, 'info');
+  try {
+    const res = await fetch('https://ipapi.co/json/');
+    const data = await res.json();
+    if (data && data.latitude && data.longitude) {
+      const lat = parseFloat(data.latitude.toFixed(6));
+      const lng = parseFloat(data.longitude.toFixed(6));
+      const city = data.city || data.region || 'IP Location';
+      updateOriginFromGPS(lat, lng, `GPS (${city})`);
+      return;
+    }
+  } catch (e) {
+    // Ignore error and fall through
+  }
+  showToast('Could not acquire location via GPS or IP.', 'error');
+}
+
+function updateOriginFromGPS(lat, lng, nameText) {
+  state.origin.lat = lat;
+  state.origin.lng = lng;
+  state.origin.name = nameText;
+  state.placeId = '';
+
+  document.getElementById('origin-lat').value = lat;
+  document.getElementById('origin-lng').value = lng;
+  document.getElementById('place-id').value = '';
+  document.getElementById('location-search').value = `${nameText}: (${lat}, ${lng})`;
+
+  if (state.originMarker) {
+    state.originMarker.setLatLng([lat, lng]);
+  }
+  if (state.map) {
+    state.map.setView([lat, lng], 14);
+  }
+  showToast(`Location set to (${lat}, ${lng})`, 'success');
 }
 
 // Geocode Location via OpenStreetMap Nominatim
@@ -764,6 +795,8 @@ async function fetchGoogleIsochronesAPI() {
           duration_seconds: durationSec,
           duration_minutes: Math.round(durationSec / 60),
           duration_formatted: `${Math.round(durationSec / 60)} mins`,
+          max_duration_seconds: Math.max(...state.durations),
+          max_duration_formatted: `${Math.round(Math.max(...state.durations) / 60)} mins`,
           travel_mode: state.travelMode,
           travel_direction: state.travelDirection,
           routing_preference: state.routingPreference,
@@ -772,20 +805,27 @@ async function fetchGoogleIsochronesAPI() {
           fill_opacity: 0.35,
           stroke_color: color.stroke,
           stroke_weight: 2,
-          origin_lat: state.origin.lat,
-          origin_lng: state.origin.lng
+          origin_latitude: state.origin.lat,
+          origin_longitude: state.origin.lng
         },
         geometry
       });
     }
   });
 
+  const maxDurationSec = state.durations && state.durations.length > 0 ? Math.max(...state.durations) : 600;
+
   const geojson = {
     type: "FeatureCollection",
     properties: {
       generated_by: "Google Maps Isochrones API Studio",
-      origin: [state.origin.lng, state.origin.lat],
       travel_mode: state.travelMode,
+      max_duration_seconds: maxDurationSec,
+      max_duration_formatted: `${Math.round(maxDurationSec / 60)} mins`,
+      origin_latitude: state.origin.lat,
+      origin_longitude: state.origin.lng,
+      origin: [state.origin.lng, state.origin.lat],
+      total_contours: features.length,
       created_at: new Date().toISOString()
     },
     features
@@ -953,37 +993,47 @@ function generateSimulatorIsochrones() {
       }
     }
 
-    features.push({
-      type: "Feature",
-      properties: {
-        duration_seconds: durationSec,
-        duration_minutes: durationMin,
-        duration_formatted: `${durationMin} mins`,
-        travel_mode: state.travelMode,
-        travel_direction: state.travelDirection,
-        routing_preference: state.routingPreference,
-        area_sq_km: areaSqKm,
-        fill_color: color.fill,
-        fill_opacity: 0.35 + (origIndex * 0.05),
-        stroke_color: color.stroke,
-        stroke_weight: 2,
-        origin_lat: state.origin.lat,
-        origin_lng: state.origin.lng
-      },
-      geometry: {
-        type: "Polygon",
-        coordinates: [finalRing]
-      }
-    });
+      features.push({
+        type: "Feature",
+        properties: {
+          duration_seconds: durationSec,
+          duration_minutes: durationMin,
+          duration_formatted: `${durationMin} mins`,
+          max_duration_seconds: Math.max(...state.durations),
+          max_duration_formatted: `${Math.round(Math.max(...state.durations) / 60)} mins`,
+          travel_mode: state.travelMode,
+          travel_direction: state.travelDirection,
+          routing_preference: state.routingPreference,
+          area_sq_km: areaSqKm,
+          fill_color: color.fill,
+          fill_opacity: 0.35 + (origIndex * 0.05),
+          stroke_color: color.stroke,
+          stroke_weight: 2,
+          origin_latitude: state.origin.lat,
+          origin_longitude: state.origin.lng
+        },
+        geometry: {
+          type: "Polygon",
+          coordinates: [finalRing]
+        }
+      });
+    }
   });
+
+  const maxDurationSec = state.durations && state.durations.length > 0 ? Math.max(...state.durations) : 600;
 
   return {
     type: "FeatureCollection",
     properties: {
       generated_by: "Google Maps Isochrones API Studio",
       engine: "High-Fidelity Road Network Simulator",
-      origin: [state.origin.lng, state.origin.lat],
       travel_mode: state.travelMode,
+      max_duration_seconds: maxDurationSec,
+      max_duration_formatted: `${Math.round(maxDurationSec / 60)} mins`,
+      origin_latitude: state.origin.lat,
+      origin_longitude: state.origin.lng,
+      origin: [state.origin.lng, state.origin.lat],
+      total_contours: features.length,
       created_at: new Date().toISOString()
     },
     features
