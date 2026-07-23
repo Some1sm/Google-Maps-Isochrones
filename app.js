@@ -1308,11 +1308,11 @@ function renderAllLayers() {
       const legendItem = document.createElement('div');
       legendItem.className = 'legend-item';
       legendItem.innerHTML = `
-        <div class="legend-item-left">
+        <div class="legend-item-left" title="${layerObj.name}">
           <span class="color-swatch" style="background-color: ${layerObj.color}; border-color: #ffffff;"></span>
-          <span style="font-weight: 600;">${layerObj.name}</span>
+          <span class="legend-layer-name">${layerObj.name}</span>
         </div>
-        <span class="text-muted" style="font-size: 0.72rem;">${layerObj.geojson.features.length} zones</span>
+        <span class="text-muted" style="font-size: 0.72rem; flex-shrink: 0;">${layerObj.geojson.features.length} zones</span>
       `;
       legendItemsContainer.appendChild(legendItem);
     }
