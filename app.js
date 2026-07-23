@@ -1021,31 +1021,30 @@ function generateSimulatorIsochrones() {
       }
     }
 
-      features.push({
-        type: "Feature",
-        properties: {
-          duration_seconds: durationSec,
-          duration_minutes: durationMin,
-          duration_formatted: `${durationMin} mins`,
-          max_duration_seconds: Math.max(...state.durations),
-          max_duration_formatted: `${Math.round(Math.max(...state.durations) / 60)} mins`,
-          travel_mode: state.travelMode,
-          travel_direction: state.travelDirection,
-          routing_preference: state.routingPreference,
-          area_sq_km: areaSqKm,
-          fill_color: color.fill,
-          fill_opacity: 0.35 + (origIndex * 0.05),
-          stroke_color: color.stroke,
-          stroke_weight: 2,
-          origin_latitude: state.origin.lat,
-          origin_longitude: state.origin.lng
-        },
-        geometry: {
-          type: "Polygon",
-          coordinates: [finalRing]
-        }
-      });
-    }
+    features.push({
+      type: "Feature",
+      properties: {
+        duration_seconds: durationSec,
+        duration_minutes: durationMin,
+        duration_formatted: `${durationMin} mins`,
+        max_duration_seconds: Math.max(...state.durations),
+        max_duration_formatted: `${Math.round(Math.max(...state.durations) / 60)} mins`,
+        travel_mode: state.travelMode,
+        travel_direction: state.travelDirection,
+        routing_preference: state.routingPreference,
+        area_sq_km: areaSqKm,
+        fill_color: color.fill,
+        fill_opacity: 0.35 + (origIndex * 0.05),
+        stroke_color: color.stroke,
+        stroke_weight: 2,
+        origin_latitude: state.origin.lat,
+        origin_longitude: state.origin.lng
+      },
+      geometry: {
+        type: "Polygon",
+        coordinates: [finalRing]
+      }
+    });
   });
 
   const maxDurationSec = state.durations && state.durations.length > 0 ? Math.max(...state.durations) : 600;
